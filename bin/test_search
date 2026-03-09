@@ -1,0 +1,56 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Quick test: index a directory and run a search from the command line.
+# Useful for verifying the pipeline works before connecting to Claude Desktop.
+#
+# Usage:
+#   ruby bin/test_search <vault_name> <vault_directory> <search_query> [limit]
+#
+# Example:
+#   ruby bin/test_search drakkenheim /path/to/vault "undead in the ruins" 5
+
+require_relative "../lib/embedder"
+require_relative "../lib/vector_store"
+require_relative "../lib/indexer"
+
+if ARGV.length < 3
+  puts "Usage: ruby bin/test_search <vault_name> <vault_directory> <search_query> [limit]"
+  exit 1
+end
+
+vault_name = ARGV[0]
+directory  = ARGV[1]
+query      = ARGV[2]
+limit      = (ARGV[3] || 5).to_i
+
+db_url = ENV.fetch("DATABASE_URL", "postgresql://localhost/obsidian_rag")
+
+embedder = MarkdownMcp::Embedder.new
+store    = MarkdownMcp::VectorStore.new(db_url: db_url)
+indexer  = MarkdownMcp::Indexer.new(embedder: embedder, store: store)
+
+store.setup!
+
+puts "Indexing '#{vault_name}' from #{directory}..."
+stats = indexer.index(directory: directory, vault_name: vault_name, recursive: true)
+puts "Indexed: #{stats.inspect}"
+puts ""
+
+puts "Searching vault '#{vault_name}' for: '#{query}'"
+puts "---"
+query_embedding = embedder.embed(query)
+results = store.search(query_embedding, vault_name: vault_name, limit: limit)
+
+if results.empty?
+  puts "No results. Is the vault indexed and does it have matching content?"
+else
+  results.each_with_index do |r, i|
+    puts "Result #{i + 1} (distance: #{r[:distance].round(4)})"
+    puts "  File: #{r[:file_path]}"
+    puts "  Title: #{r[:doc_title]}"
+    puts "  Section: #{r[:heading]}" if r[:heading]
+    puts "  Content preview: #{r[:content][0..200]}..."
+    puts ""
+  end
+end

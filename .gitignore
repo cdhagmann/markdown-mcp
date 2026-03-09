@@ -1,0 +1,21 @@
+# Ignore bundler installed gems
+/vendor/bundle/
+/.bundle/
+
+# Ignore gem lock for library-style projects (optional — remove this line
+# if you want to lock deps for reproducible deploys)
+# Gemfile.lock
+
+# Editor / OS
+.DS_Store
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Logs
+*.log
+
+# Local env
+.env

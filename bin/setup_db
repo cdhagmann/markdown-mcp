@@ -1,0 +1,26 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Standalone setup script: creates the database and schema.
+# Run this once before starting the MCP server.
+#
+# Usage:
+#   createdb obsidian_rag
+#   ruby bin/setup_db
+
+require_relative "../lib/embedder"
+require_relative "../lib/vector_store"
+
+db_url = ENV.fetch("DATABASE_URL", "postgresql://localhost/obsidian_rag")
+
+puts "Setting up database at #{db_url}..."
+
+store = MarkdownMcp::VectorStore.new(db_url: db_url)
+store.setup!
+
+puts "Done. Schema created with pgvector extension."
+puts ""
+puts "Next steps:"
+puts "  1. Make sure Ollama is running: ollama serve"
+puts "  2. Pull the embedding model: ollama pull nomic-embed-text"
+puts "  3. Start the MCP server: ruby bin/server"

@@ -1,0 +1,13 @@
+#!/bin/sh
+# Ensures Postgres + Ollama are running before starting the MCP server.
+# Claude Desktop calls this instead of docker directly.
+# All arguments are forwarded to docker, so the claude_desktop_config.json
+# args array stays unchanged (starts with "run", "-i", "--rm", ...).
+
+cd "$(dirname "$0")/.."
+
+# Redirect ALL output — stdout or stderr from compose would corrupt the MCP JSON stream.
+# Drop --wait so this returns immediately; services already running = instant.
+docker compose up -d > /dev/null 2>&1 || true
+
+exec docker "$@"

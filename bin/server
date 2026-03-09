@@ -1,0 +1,14 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Entry point for the MCP server.
+# Claude Desktop will launch this as a subprocess over stdio.
+#
+# Environment variables:
+#   DATABASE_URL  - PostgreSQL connection string (default: postgresql://localhost/obsidian_rag)
+#   OLLAMA_MODEL  - Ollama embedding model (default: nomic-embed-text)
+#   OLLAMA_URL    - Ollama API base URL (default: http://localhost:11434)
+
+require_relative "../lib/server"
+
+MarkdownMcp::Server.new.run
