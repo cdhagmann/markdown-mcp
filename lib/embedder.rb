@@ -9,7 +9,7 @@ module MarkdownMcp
   # quality and speed). Swap it for any Ollama-supported embedding model.
   class Embedder
     DEFAULT_MODEL = "nomic-embed-text"
-    DEFAULT_BASE_URL = "http://localhost:11434"
+    DEFAULT_BASE_URL = "http://localhost:11435"
 
     attr_reader :model, :base_url, :dimensions
 

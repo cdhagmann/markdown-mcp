@@ -36,7 +36,7 @@ module MarkdownMcp
 
     # Index all .md files in the given directory into the given vault.
     # Returns a summary hash with counts.
-    def index(directory:, vault_name:, force_reindex: false, recursive: false)
+    def index(directory:, vault_name:, force_reindex: false, recursive: true)
       directory = File.expand_path(directory)
 
       unless Dir.exist?(directory)

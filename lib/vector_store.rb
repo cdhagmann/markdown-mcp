@@ -53,18 +53,17 @@ module MarkdownMcp
           embedding vector(#{@dimensions}),
           indexed_at TIMESTAMP DEFAULT NOW()
         );
-
-        CREATE INDEX IF NOT EXISTS idx_chunks_file_path ON chunks(file_path);
-        CREATE INDEX IF NOT EXISTS idx_chunks_content_hash ON chunks(content_hash);
-        CREATE INDEX IF NOT EXISTS idx_chunks_vault_name ON chunks(vault_name);
       SQL
 
-      # Migration: add vault_name to existing installations
+      # Migration: add vault_name to existing installations before creating index on it
       connection.exec(<<~SQL)
         ALTER TABLE chunks ADD COLUMN IF NOT EXISTS vault_name TEXT NOT NULL DEFAULT 'default';
       SQL
 
       connection.exec(<<~SQL)
+        CREATE INDEX IF NOT EXISTS idx_chunks_file_path ON chunks(file_path);
+        CREATE INDEX IF NOT EXISTS idx_chunks_content_hash ON chunks(content_hash);
+        CREATE INDEX IF NOT EXISTS idx_chunks_vault_name ON chunks(vault_name);
         CREATE INDEX IF NOT EXISTS idx_chunks_embedding
         ON chunks
         USING hnsw (embedding vector_cosine_ops);

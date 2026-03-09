@@ -39,11 +39,15 @@ module MarkdownMcp
           You are working with one or more Obsidian vaults via semantic search and file tools.
           Each vault is a named, independent collection of markdown notes with its own search index.
 
-          ## Vault selection
+          ## Vault layout
+          - The filesystem is mounted at /vault. Each immediate subdirectory of /vault is a separate vault.
+            For example: /vault/Drakkenheim, /vault/FlowDice, /vault/Personal
+          - Never use /vault itself as a vault directory — always use a subdirectory.
+          - Use vault_list_vaults to see what vaults are already indexed.
+          - To index all vaults at once, call vault_discover with root: "/vault".
+          - To index a single vault, call vault_index with the vault name and its subdirectory path (e.g. directory: "/vault/FlowDice").
+          - Vault names are short identifiers matching the subdirectory name (e.g. "Drakkenheim", "FlowDice").
           - Always confirm which vault the user wants to work with before performing any operation.
-          - Use vault_list_vaults to see what vaults exist.
-          - Vault names are short identifiers like "drakkenheim", "flowdice", or "personal".
-          - To create a new vault, call vault_index with a new name and the directory path — it registers automatically.
 
           ## Pre-write workflow (follow every time before vault_write)
           1. vault_list — browse the vault root and relevant subdirectories to check whether a file with a similar name already exists. If it does, use vault_read + vault_write (overwrite: true) to update it rather than creating a duplicate.
@@ -241,6 +245,76 @@ module MarkdownMcp
           MCP::Tool::Response.new([{ type: "text", text: summary }])
         rescue => e
           logger.error("Index error: #{e.message}")
+          MCP::Tool::Response.new([{ type: "text", text: "Error: #{e.message}" }])
+        end
+      end
+
+      # --- Tool: vault_discover ---
+      server.define_tool(
+        name: "vault_discover",
+        description: <<~DESC.strip,
+          Scan a root directory and index each immediate subdirectory as a separate vault.
+          The vault name is derived from the subdirectory name (e.g. "FlowDice", "Drakkenheim").
+          Use this when your vaults live as subdirectories under a single Obsidian root.
+          Supports incremental updates by default; set force_reindex to true to rebuild all vaults.
+          Set recursive to true to include subdirectories within each vault.
+        DESC
+        input_schema: {
+          type: "object",
+          properties: {
+            root: {
+              type: "string",
+              description: "Absolute path to the root directory containing vault subdirectories"
+            },
+            force_reindex: {
+              type: "boolean",
+              description: "If true, clears and rebuilds every vault's index. Default: false"
+            },
+            recursive: {
+              type: "boolean",
+              description: "If true, includes subdirectories within each vault. Default: true"
+            }
+          },
+          required: ["root"]
+        },
+        annotations: {
+          read_only_hint: false,
+          destructive_hint: false,
+          idempotent_hint: true,
+          open_world_hint: false
+        }
+      ) do |root:, force_reindex: false, recursive: true|
+        begin
+          root = File.expand_path(root)
+          unless Dir.exist?(root)
+            next MCP::Tool::Response.new([{ type: "text", text: "Error: Directory not found: #{root}" }])
+          end
+
+          subdirs = Dir.entries(root)
+            .reject { |e| e.start_with?(".") }
+            .map { |e| File.join(root, e) }
+            .select { |e| File.directory?(e) }
+            .sort
+
+          if subdirs.empty?
+            next MCP::Tool::Response.new([{ type: "text", text: "No subdirectories found in #{root}" }])
+          end
+
+          results = []
+          subdirs.each do |dir|
+            vault_name = File.basename(dir)
+            logger.info("Discovering vault '#{vault_name}' from #{dir}")
+            store.register_vault(vault_name, dir)
+            stats = indexer.index(directory: dir, vault_name: vault_name, force_reindex: force_reindex, recursive: recursive)
+            results << "#{vault_name}: #{stats[:files_indexed]} files indexed, #{stats[:chunks_added]} chunks added (#{stats[:files_scanned]} scanned)"
+          end
+
+          MCP::Tool::Response.new([{
+            type: "text",
+            text: "Discovered #{subdirs.size} vault(s) from #{root}:\n" + results.join("\n")
+          }])
+        rescue => e
+          logger.error("Discover error: #{e.message}")
           MCP::Tool::Response.new([{ type: "text", text: "Error: #{e.message}" }])
         end
       end

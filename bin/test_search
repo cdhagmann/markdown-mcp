@@ -1,26 +1,26 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# Quick test: index a directory and run a search from the command line.
+# Quick test: discover vaults from a root directory and run a search.
 # Useful for verifying the pipeline works before connecting to Claude Desktop.
 #
 # Usage:
-#   ruby bin/test_search <vault_name> <vault_directory> <search_query> [limit]
+#   ruby bin/test_search <root_directory> <vault_name> <search_query> [limit]
 #
 # Example:
-#   ruby bin/test_search drakkenheim /path/to/vault "undead in the ruins" 5
+#   ruby bin/test_search /vault Drakkenheim "undead in the ruins" 5
 
 require_relative "../lib/embedder"
 require_relative "../lib/vector_store"
 require_relative "../lib/indexer"
 
 if ARGV.length < 3
-  puts "Usage: ruby bin/test_search <vault_name> <vault_directory> <search_query> [limit]"
+  puts "Usage: ruby bin/test_search <root_directory> <vault_name> <search_query> [limit]"
   exit 1
 end
 
-vault_name = ARGV[0]
-directory  = ARGV[1]
+root       = File.expand_path(ARGV[0])
+vault_name = ARGV[1]
 query      = ARGV[2]
 limit      = (ARGV[3] || 5).to_i
 
@@ -32,9 +32,19 @@ indexer  = MarkdownMcp::Indexer.new(embedder: embedder, store: store)
 
 store.setup!
 
-puts "Indexing '#{vault_name}' from #{directory}..."
-stats = indexer.index(directory: directory, vault_name: vault_name, recursive: true)
-puts "Indexed: #{stats.inspect}"
+subdirs = Dir.entries(root)
+  .reject { |e| e.start_with?(".") }
+  .map { |e| File.join(root, e) }
+  .select { |e| File.directory?(e) }
+  .sort
+
+puts "Discovering #{subdirs.size} vault(s) from #{root}..."
+subdirs.each do |dir|
+  name = File.basename(dir)
+  store.register_vault(name, dir)
+  stats = indexer.index(directory: dir, vault_name: name)
+  puts "  #{name}: #{stats[:files_indexed]} files indexed, #{stats[:chunks_added]} chunks added"
+end
 puts ""
 
 puts "Searching vault '#{vault_name}' for: '#{query}'"
